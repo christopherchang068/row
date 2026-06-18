@@ -1262,6 +1262,39 @@ img, video, canvas, svg { max-width: 100%; }
 }
 
 .hidden { display: none !important; }
+
+/* ---- Workout history grid ---- */
+.po-history-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 5px;
+  margin-top: 10px;
+}
+.po-hc {
+  aspect-ratio: 1;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.06);
+}
+.po-hc.po-hc-active { opacity: 0.88; }
+.po-history-legend {
+  display: flex; flex-wrap: wrap; gap: 10px 16px;
+  margin-top: 10px;
+}
+.po-hc-legend-item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-2);
+}
+.po-hc-legend-dot {
+  width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0;
+}
+
+/* ---- Day color picker in settings ---- */
+.po-day-color-pick {
+  width: 30px; height: 30px;
+  padding: 2px; border: none;
+  border-radius: 6px; cursor: pointer;
+  background: transparent; flex-shrink: 0;
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1510,6 +1543,13 @@ img, video, canvas, svg { max-width: 100%; }
       </button>
       <div class="po-tw-past-body" id="poTwPastBody" style="display:none"></div>
     </div>
+
+    <!-- 30-day workout history grid -->
+    <div class="po-sub-section">
+      <div class="po-sub-title">Last 30 days</div>
+      <div class="po-history-grid" id="poHistoryGrid"></div>
+      <div class="po-history-legend" id="poHistoryLegend"></div>
+    </div>
   </div>
 </div>
 
@@ -1596,7 +1636,7 @@ img, video, canvas, svg { max-width: 100%; }
     </div>
 
     <div class="po-set-section">
-      <h4>Days</h4>
+      <h4>Days &amp; colours</h4>
       <div class="po-set-list" id="setDays"></div>
       <button class="po-add-row-btn" id="setAddDay">+ Add day</button>
     </div>
@@ -1638,11 +1678,14 @@ img, video, canvas, svg { max-width: 100%; }
     } catch (e) {}
     return normalize({});
   }
+  const DAY_PALETTE = ['#3b82f6','#22c55e','#f97316','#a78bfa','#f43f5e','#64748b'];
+
   function normalize(s) {
     s = s || {};
     s.units = s.units || CONFIG.units || 'kg';
     s.gyms  = (Array.isArray(s.gyms)  && s.gyms.length)  ? s.gyms  : CONFIG.gyms.slice();
     s.days  = (Array.isArray(s.days)  && s.days.length)  ? s.days  : CONFIG.days.slice();
+    s.days.forEach((d, i) => { if (!d.color) d.color = DAY_PALETTE[i % DAY_PALETTE.length]; });
     s.exercises = Array.isArray(s.exercises) ? s.exercises : buildDefaultExercises();
     s.logs = (s.logs && typeof s.logs === 'object') ? s.logs : {};
     s.filterGym = s.filterGym || s.gyms[0].id;
@@ -1687,6 +1730,7 @@ img, video, canvas, svg { max-width: 100%; }
   function uid() { return 'ex_' + Date.now() + '_' + Math.floor(Math.random() * 9999); }
   function gymName(id) { const g = state.gyms.find(x => x.id === id); return g ? g.name : id; }
   function dayName(id) { const d = state.days.find(x => x.id === id); return d ? d.name : id; }
+  function dayColor(id) { const d = state.days.find(x => x.id === id); return d ? (d.color || '#64748b') : '#64748b'; }
   function estimate1RM(w, r) { if (r < 2) return w; return w * (1 + r / 30); }
   function roundToStep(v, s) { return Math.round(v / s) * s; }
   function getFiltered() {
@@ -2007,6 +2051,34 @@ img, video, canvas, svg { max-width: 100%; }
     row.dataset.value = String(active);
   }
 
+  function renderHistoryGrid() {
+    const grid = $('poHistoryGrid');
+    const legendEl = $('poHistoryLegend');
+    if (!grid) return;
+    const byDay = logsByDay();
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const cells = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today); d.setDate(today.getDate() - i);
+      const dk = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+      cells.push(dk);
+    }
+    const usedDayIds = new Set();
+    grid.innerHTML = cells.map(dk => {
+      const sets = byDay[dk];
+      if (!sets || !sets.length) return '<div class="po-hc" title="' + dk.slice(5) + '"></div>';
+      const counts = {};
+      sets.forEach(({ex}) => { counts[ex.day] = (counts[ex.day] || 0) + 1; });
+      const topId = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+      usedDayIds.add(topId);
+      const col = dayColor(topId);
+      return '<div class="po-hc po-hc-active" style="background:' + col + '" title="' + dk.slice(5) + ' · ' + dayName(topId) + '"></div>';
+    }).join('');
+    legendEl.innerHTML = [...usedDayIds].map(id =>
+      '<div class="po-hc-legend-item"><span class="po-hc-legend-dot" style="background:' + dayColor(id) + '"></span>' + escape(dayName(id)) + '</div>'
+    ).join('');
+  }
+
   function renderAll() {
     renderDayPill();
     renderFilters(); renderSelect(); renderForm(); renderLastSet();
@@ -2014,6 +2086,7 @@ img, video, canvas, svg { max-width: 100%; }
     renderRx(); renderStats(); renderSparkline(); renderHistory();
     renderTodaysWorkout();
     renderPastWorkouts();
+    renderHistoryGrid();
     // Pre-fill weight input with last logged weight (or starting weight)
     const ex = getCurrentEx();
     if (ex && !ex.bw) {
@@ -2461,6 +2534,7 @@ img, video, canvas, svg { max-width: 100%; }
     ).join('');
     $('setDays').innerHTML = state.days.map((d, i) =>
       '<div class="po-set-row" data-i="' + i + '">'
+      + '<input type="color" class="po-day-color-pick" value="' + (d.color || DAY_PALETTE[i % DAY_PALETTE.length]) + '" data-field="color" title="Pick colour">'
       + '<input type="text" value="' + escape(d.name) + '" data-field="name" placeholder="Day name">'
       + '<button class="po-mini-btn" data-action="del" aria-label="Delete">×</button>'
       + '</div>'
@@ -2481,9 +2555,13 @@ img, video, canvas, svg { max-width: 100%; }
     });
     $('setDays').querySelectorAll('.po-set-row').forEach(row => {
       const i = parseInt(row.dataset.i, 10);
-      row.querySelector('input').addEventListener('input', e => {
+      row.querySelector('input[data-field="name"]').addEventListener('input', e => {
         state.days[i].name = e.target.value;
         saveState();
+      });
+      row.querySelector('input[data-field="color"]').addEventListener('input', e => {
+        state.days[i].color = e.target.value;
+        saveState(); renderHistoryGrid();
       });
       row.querySelector('[data-action="del"]').addEventListener('click', () => {
         if (state.days.length <= 1) { alert('You need at least one day.'); return; }
@@ -2507,7 +2585,6 @@ img, video, canvas, svg { max-width: 100%; }
       state.units = b.dataset.u; saveState();
       $('setUnitsSeg').querySelectorAll('button').forEach(x => x.classList.remove('active'));
       b.classList.add('active');
-      if (typeof wtRender === 'function') wtRender();
     });
   });
   $('setAddGym').addEventListener('click', () => {
@@ -2521,7 +2598,8 @@ img, video, canvas, svg { max-width: 100%; }
     const name = (prompt('New day name:') || '').trim();
     if (!name) return;
     const id = 'd_' + Date.now();
-    state.days.push({ id, name });
+    const color = DAY_PALETTE[state.days.length % DAY_PALETTE.length];
+    state.days.push({ id, name, color });
     saveState(); renderSettings(); renderAll();
   });
 
