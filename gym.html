@@ -1702,6 +1702,27 @@ img, video, canvas, svg { max-width: 100%; }
   }
   function getLogs() { return (state.logs[state.currentEx] || []).slice(); }
 
+  // Returns one "top set" per calendar day — the set with the highest
+  // estimated 1RM (weighted) or highest reps (bodyweight) — in chronological
+  // order. This is what drives the trend chart and the prescription engine.
+  function getTopSets(exId, ex) {
+    const byDay = {};
+    (state.logs[exId] || []).forEach(l => {
+      const dk = l.date.slice(0, 10);
+      if (!byDay[dk]) byDay[dk] = [];
+      byDay[dk].push(l);
+    });
+    return Object.keys(byDay).sort().map(dk => {
+      let top = byDay[dk][0];
+      byDay[dk].forEach(l => {
+        const cur  = ex.bw ? l.reps : estimate1RM(l.weight, l.reps);
+        const best = ex.bw ? top.reps : estimate1RM(top.weight, top.reps);
+        if (cur > best) top = l;
+      });
+      return top;
+    });
+  }
+
   // Prescription engine — "what should I do next session?"
   // Upgrade trigger: hits CONFIG.upgradeAtReps (default 8) OR the
   // exercise's repMax, whichever fires first. So a 5-8 lifter hits
@@ -1814,7 +1835,7 @@ img, video, canvas, svg { max-width: 100%; }
     const wrap = $('rxWrap');
     const ex = getCurrentEx();
     if (!ex) { wrap.innerHTML = '<div class="po-rx-empty">Pick a gym and day above.</div>'; return; }
-    const logs = getLogs();
+    const logs = getTopSets(state.currentEx, ex);
     const rx = getRx(ex, logs);
     if (!rx) {
       const sw = ex.startWeight, sr = ex.repMin;
@@ -1855,13 +1876,13 @@ img, video, canvas, svg { max-width: 100%; }
       if (cur > bestVal) best = l;
     });
     $('bestSet').textContent = ex.bw ? (best.reps + 'r') : (best.weight + '×' + best.reps);
-    $('sessionCount').textContent = logs.length;
+    $('sessionCount').textContent = getTopSets(state.currentEx, ex).length;
   }
   function renderSparkline() {
     const svg = $('sparkline');
     const empty = $('sparkEmpty');
     const ex = getCurrentEx();
-    const logs = ex ? getLogs().slice(-10) : [];
+    const logs = ex ? getTopSets(state.currentEx, ex).slice(-10) : [];
     if (logs.length < 2) {
       svg.style.display = 'none'; empty.style.display = 'block';
       return;
@@ -2211,8 +2232,6 @@ img, video, canvas, svg { max-width: 100%; }
     arr.push({ weight: w, reps: reps, date: new Date().toISOString() });
     state.logs[ex.id] = arr;
     saveState(); renderAll();
-    // Strength changed → composition estimate may shift
-    if (typeof wtRender === 'function') wtRender();
     // Tiny pulse on the button so the user feels the save
     const btn = $('logBtn');
     btn.style.transition = 'transform 0.15s';
