@@ -3173,7 +3173,7 @@ img, video, canvas, svg { max-width: 100%; }
         .from('app_state').select('data').eq('key', APP_KEY).maybeSingle();
       if (!error && data && data.data && Object.keys(data.data).length > 0) {
         pcLastSyncedJson = JSON.stringify(data.data);
-        pcMaybeApplyRemote(data.data);
+        if (pcApplyRemoteState(data.data)) { window.location.reload(); return; }
       } else if (Object.keys(pcCollectState()).length > 0) {
         pcSchedulePush();
       }
