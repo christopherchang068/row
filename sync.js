@@ -111,7 +111,7 @@
         const { data, error } = await supa.from('app_state').select('data').eq('key', appKey).maybeSingle();
         if (!error && data && data.data && Object.keys(data.data).length > 0) {
           lastSyncedJson = JSON.stringify(data.data);
-          applyRemote(data.data);
+          if (applyRemote(data.data)) { window.location.reload(); return; }
         } else if (Object.keys(collect()).length > 0) {
           schedulePush();
         }
