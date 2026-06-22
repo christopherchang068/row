@@ -192,4 +192,8 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   } else {
     boot();
   }
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(function () {});
+  }
 })();
