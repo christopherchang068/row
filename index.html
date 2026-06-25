@@ -596,6 +596,56 @@ body::after {
   .gm-card { padding: 16px; }
   .gm-progress-num { font-size: 36px; }
 }
+
+/* ===== Day Ring hours editor ===== */
+.day-ring-hours-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);
+  background: none; border: none; cursor: pointer; padding: 3px 0;
+  -webkit-tap-highlight-color: transparent; transition: color 0.15s;
+}
+.day-ring-hours-btn:hover { color: var(--text-secondary); }
+.day-ring-hours-edit-icon { font-size: 9px; opacity: 0.5; }
+.day-ring-hours-edit {
+  margin-top: 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 10px;
+  padding: 12px 14px;
+  width: 100%;
+}
+.day-ring-hours-edit-row {
+  display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.dr-time-label {
+  display: flex; flex-direction: column; gap: 4px;
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-tertiary);
+}
+.dr-time-input {
+  padding: 7px 8px;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-mono); font-size: 13px;
+  color-scheme: dark; outline: none;
+}
+.dr-time-sep { font-size: 14px; color: var(--text-tertiary); padding-bottom: 7px; }
+.day-ring-hours-edit-btns { display: flex; gap: 6px; }
+.dr-save-btn {
+  padding: 7px 16px; background: #E07658;
+  color: #fff; border: none; border-radius: 6px;
+  font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+  transition: opacity 0.15s;
+}
+.dr-save-btn:hover { opacity: 0.88; }
+.dr-cancel-btn {
+  padding: 7px 12px; background: rgba(255,255,255,0.05);
+  color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit;
+}
 </style>
 <link rel="stylesheet" href="/theme-sharp.css">
 </head>
@@ -639,7 +689,21 @@ body::after {
     <div class="day-ring-text">
       <div class="day-ring-status"    id="dayRingStatus">Loading…</div>
       <div class="day-ring-remaining" id="dayRingRemaining">—</div>
-      <div class="day-ring-hours">8:00 AM – 12:00 AM</div>
+      <button class="day-ring-hours-btn" id="dayRingHoursBtn" aria-label="Edit waking hours">
+        <span id="dayRingHoursLabel">7:00 AM – 11:00 PM</span>
+        <span class="day-ring-hours-edit-icon">✎</span>
+      </button>
+      <div class="day-ring-hours-edit" id="dayRingHoursEdit" hidden>
+        <div class="day-ring-hours-edit-row">
+          <label class="dr-time-label">Wake up<input type="time" id="drWakeInput" class="dr-time-input" value="07:00"></label>
+          <span class="dr-time-sep">→</span>
+          <label class="dr-time-label">Sleep<input type="time" id="drSleepInput" class="dr-time-input" value="23:00"></label>
+        </div>
+        <div class="day-ring-hours-edit-btns">
+          <button class="dr-save-btn" id="drSaveBtn">Save</button>
+          <button class="dr-cancel-btn" id="drCancelBtn">Cancel</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -704,8 +768,20 @@ body::after {
   // Paste your Anthropic key here to enable ✨ Polish. Empty = falls back to plain add.
   const ANTHROPIC_API_KEY = '';
 
-  const WAKE_HOUR  = 8;
-  const SLEEP_HOUR = 24;
+  function loadDayHours() {
+    const saved = storeGet('day_ring_hours');
+    return {
+      wake:  (saved && saved.wake)  ? saved.wake  : '07:00',
+      sleep: (saved && saved.sleep) ? saved.sleep : '23:00'
+    };
+  }
+  function timeStrToH(t) {
+    const parts = String(t || '').split(':');
+    return Number(parts[0]) + (Number(parts[1]) || 0) / 60;
+  }
+  const _dh = loadDayHours();
+  let WAKE_HOUR  = timeStrToH(_dh.wake);
+  let SLEEP_HOUR = timeStrToH(_dh.sleep);
 
   // ---------- storage helpers ----------
   function storeGet(key) {
@@ -973,6 +1049,58 @@ body::after {
     const minsLeft = (SLEEP_HOUR - hours) * 60;
     remainingEl.textContent = formatRemaining(minsLeft) + ' awake time left';
   }
+
+  // ---------- Day Ring hours editor ----------
+  function hToTimeStr(h) {
+    const totalMins = Math.round(h * 60);
+    const hh = Math.floor(totalMins / 60) % 24;
+    const mm = totalMins % 60;
+    return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+  }
+  function fmtHour(h) {
+    const totalMins = Math.round(h * 60);
+    const hh = Math.floor(totalMins / 60) % 24;
+    const mm = totalMins % 60;
+    const ampm = hh >= 12 ? 'PM' : 'AM';
+    const h12 = hh % 12 || 12;
+    return h12 + ':' + String(mm).padStart(2, '0') + ' ' + ampm;
+  }
+  function updateHoursLabel() {
+    const el = document.getElementById('dayRingHoursLabel');
+    if (el) el.textContent = fmtHour(WAKE_HOUR) + ' – ' + fmtHour(SLEEP_HOUR);
+  }
+  (function () {
+    const btn       = document.getElementById('dayRingHoursBtn');
+    const edit      = document.getElementById('dayRingHoursEdit');
+    const wakeIn    = document.getElementById('drWakeInput');
+    const sleepIn   = document.getElementById('drSleepInput');
+    const saveBtn   = document.getElementById('drSaveBtn');
+    const cancelBtn = document.getElementById('drCancelBtn');
+    if (!btn || !edit) return;
+
+    btn.addEventListener('click', function () {
+      if (!edit.hidden) { edit.hidden = true; return; }
+      wakeIn.value  = hToTimeStr(WAKE_HOUR);
+      sleepIn.value = hToTimeStr(SLEEP_HOUR);
+      edit.hidden = false;
+      wakeIn.focus();
+    });
+
+    saveBtn.addEventListener('click', function () {
+      const w = timeStrToH(wakeIn.value);
+      const s = timeStrToH(sleepIn.value);
+      if (isNaN(w) || isNaN(s) || s <= w) return;
+      WAKE_HOUR  = w;
+      SLEEP_HOUR = s;
+      storeSet('day_ring_hours', { wake: wakeIn.value, sleep: sleepIn.value });
+      updateHoursLabel();
+      updateDayRing();
+      edit.hidden = true;
+    });
+
+    cancelBtn.addEventListener('click', function () { edit.hidden = true; });
+  })();
+  updateHoursLabel();
 
   // ---------- Row building ----------
   function makeInlineEdit(textEl, goals, idx, key, reload) {
