@@ -1,0 +1,125 @@
+/* theme-sharp.css
+   Sharp corners + solid flat colours. No gradients. No blur.
+   ─────────────────────────────────────────────────────────
+   TO REVERT: remove this line from every HTML <head>:
+       <link rel="stylesheet" href="/theme-sharp.css">
+   ───────────────────────────────────────────────── */
+
+/* ── CSS variables (used by finance.html + health.html) ── */
+:root {
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --glass-bg: #141416;
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-strong: rgba(255, 255, 255, 0.12);
+  --glass-shadow: none;
+  --bg-card: #141416;
+  --bg-secondary: #1a1a1c;
+  --bg-input: rgba(0, 0, 0, 0.45);
+}
+
+/* ── Border-radius: everything sharp ── */
+* { border-radius: 0 !important; }
+/* Preserve perfectly-circular decorative dots */
+.goal-ticker-led-dot { border-radius: 50% !important; }
+
+/* ── Body backdrop gradients → remove ── */
+body::before { background: none !important; animation: none !important; }
+body::after  { display: none !important; }
+/* Freeze the drift animation so no subtle motion remains */
+@keyframes drift { 0%, 100% { transform: none; } }
+
+/* gym.html sets gradient directly on html/body; replace with solid */
+html, body { background: #0a0a0b !important; }
+
+/* ── Cards: glass/blur → flat solid ── */
+.card {
+  background: #141416 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+.card::before { display: none !important; }
+
+/* health.html stack card */
+.stack-card {
+  background: #141416 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* index.html goal cards */
+.gm-card {
+  background: #141416 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+/* ── index.html: title gradient text → solid white ── */
+.dash-title {
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  -webkit-text-fill-color: #FAFAFA !important;
+  color: #FAFAFA !important;
+}
+
+/* ── index.html: goal ticker → flat ── */
+.goal-ticker {
+  background: #141416 !important;
+  box-shadow: none !important;
+}
+.goal-ticker::after { display: none !important; }
+.goal-ticker-led-dot { box-shadow: none !important; }
+
+/* ── gym.html: tab bar → solid ── */
+.tabbar {
+  background: #0a0a0b !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.tabbar-inner {
+  background: #141416 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+}
+
+/* gym.html: done button → solid white (was gradient) */
+.po-tw-done-btn { background: #ffffff !important; }
+
+/* gym.html: weight comparison bar → flat bg */
+.wt-comp-bars { background: rgba(255, 255, 255, 0.07) !important; }
+
+/* ── finance.html: bottom tab bar → solid ── */
+.bottom-tabs {
+  background: #0a0a0b !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.bottom-tabs::before { display: none !important; }
+
+/* ── topbar.js injected bars → solid ── */
+.topbar  { background: #0a0a0b !important; }
+.bottombar { background: #0a0a0b !important; }
+
+/* ── Progress bars: remove glow/rounded caps ── */
+.stack-progress-fill { box-shadow: none !important; }
+
+/* ── Modals → flat ── */
+.po-modal {
+  background: #141416 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+.modal {
+  background: #141416 !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}

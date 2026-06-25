@@ -12,6 +12,7 @@ const APP_SHELL = [
   '/icon-180.png',
   '/icon-192.png',
   '/icon-512.png',
+  '/theme-sharp.css',
 ];
 
 self.addEventListener('install', (e) => {
