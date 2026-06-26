@@ -321,6 +321,29 @@ body::after {
   color: var(--text-tertiary);
 }
 .gm-card-tomorrow .gm-progress-row { display: none; }
+.gm-card-future   .gm-progress-row { display: none; }
+
+/* ===== Plan-ahead date picker ===== */
+.gm-future-picker-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 14px;
+}
+.gm-future-date-input {
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: var(--font-mono); font-size: 13px;
+  color-scheme: dark; outline: none; cursor: pointer;
+}
+.gm-future-date-input:focus { border-color: rgba(255,255,255,0.22); }
+.gm-future-date-label {
+  font-size: 13px; font-weight: 600; color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+.gm-future-content { display: none; }
+.gm-future-content.has-date { display: block; }
 
 .gm-streak {
   display: inline-flex; align-items: center; gap: 6px;
@@ -755,6 +778,28 @@ body::after {
         <button type="button" id="tomorrowAddBtn"    class="gm-add">+ Add</button>
         <button type="button" id="tomorrowPolishBtn" class="gm-polish">✨ Polish</button>
         <div class="gm-status" id="tomorrowStatus"></div>
+      </div>
+    </div>
+
+    <!-- PLAN IN ADVANCE -->
+    <div class="gm-card gm-card-future" id="gmCardFuture">
+      <div class="gm-header">
+        <div class="gm-header-left">
+          <div class="gm-eyebrow">Plan in advance</div>
+          <div class="gm-tomorrow-sub" id="futureSub">Pick a date to plan goals for.</div>
+        </div>
+        <span class="gm-tomorrow-count" id="gmFutureCount" style="visibility:hidden">0 planned</span>
+      </div>
+      <div class="gm-future-picker-row">
+        <input type="date" id="futureDatePicker" class="gm-future-date-input">
+      </div>
+      <div class="gm-future-content" id="futureContent">
+        <ul id="futureList" class="goal-list gm-list"></ul>
+        <div id="futureEmpty" class="empty-state">Nothing planned for this date yet</div>
+        <div class="goal-input-wrap gm-input-wrap">
+          <input id="futureInput" class="gm-input" type="text" placeholder="Add a goal for this date…" autocomplete="off">
+          <button type="button" id="futureAddBtn" class="gm-add">+ Add</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1422,6 +1467,66 @@ body::after {
     document.getElementById('tomorrowStatus'),
     loadTomorrow
   );
+
+  // ---------- Plan in advance ----------
+  (function () {
+    const picker    = document.getElementById('futureDatePicker');
+    const content   = document.getElementById('futureContent');
+    const listEl    = document.getElementById('futureList');
+    const emptyEl   = document.getElementById('futureEmpty');
+    const input     = document.getElementById('futureInput');
+    const addBtn    = document.getElementById('futureAddBtn');
+    const subEl     = document.getElementById('futureSub');
+    const countEl   = document.getElementById('gmFutureCount');
+    if (!picker) return;
+
+    // Min = day after tomorrow so it doesn't overlap the "Plan tomorrow" card
+    const minD = new Date();
+    minD.setDate(minD.getDate() + 2);
+    picker.min = dateToKey(minD);
+
+    let futKey = null;
+
+    function loadFuture() {
+      if (!futKey) return;
+      const goals = getGoals(futKey);
+      const reload = loadFuture;
+      listEl.innerHTML = '';
+      goals.forEach(function (g, i) { listEl.appendChild(buildGoalRow(g, i, futKey, false, reload)); });
+      emptyEl.style.display = goals.length === 0 ? 'block' : 'none';
+      countEl.textContent = goals.length + ' planned';
+      countEl.style.visibility = '';
+    }
+
+    picker.addEventListener('change', function () {
+      const val = picker.value;
+      if (!val) {
+        futKey = null;
+        content.classList.remove('has-date');
+        subEl.textContent = 'Pick a date to plan goals for.';
+        countEl.style.visibility = 'hidden';
+        return;
+      }
+      futKey = 'goals:' + val;
+      subEl.textContent = formatDate(val);
+      content.classList.add('has-date');
+      loadFuture();
+    });
+
+    addBtn.addEventListener('click', function () {
+      if (!futKey) return;
+      const text = input.value.trim();
+      if (!text) return;
+      const list = getGoals(futKey);
+      list.push({ text: text, done: false });
+      setGoals(futKey, list);
+      input.value = '';
+      loadFuture();
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); addBtn.click(); }
+    });
+  })();
 
   // ---------- Boot ----------
   rollover();
