@@ -620,6 +620,51 @@ body::after {
   .gm-progress-num { font-size: 36px; }
 }
 
+/* ===== Future goals reminder ticker ===== */
+.fut-reminder {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; margin-bottom: 14px;
+  background: rgba(107, 227, 164, 0.06);
+  border: 1px solid rgba(107, 227, 164, 0.14);
+  border-radius: 12px;
+  font-family: var(--font-mono); font-size: 12px;
+  overflow: hidden; position: relative; min-height: 38px;
+  transition: opacity 0.3s;
+}
+.fut-reminder.hidden { display: none; }
+.fut-tag {
+  font-size: 9px; letter-spacing: 0.16em; font-weight: 800;
+  text-transform: uppercase; color: var(--success);
+  padding: 3px 8px; background: rgba(107,227,164,0.10); border-radius: 999px;
+  flex-shrink: 0; white-space: nowrap;
+}
+.fut-stream {
+  flex: 1; min-width: 0; position: relative; overflow: hidden; height: 18px;
+}
+.fut-item {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; gap: 10px;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.35s, transform 0.35s;
+  white-space: nowrap; overflow: hidden;
+}
+.fut-item.active { opacity: 1; transform: translateY(0); }
+.fut-item-text {
+  font-weight: 700; color: var(--text-primary); letter-spacing: 0.02em;
+  overflow: hidden; text-overflow: ellipsis; max-width: 58%;
+}
+.fut-item-when {
+  color: var(--text-tertiary); font-size: 10px;
+  letter-spacing: 0.08em; text-transform: uppercase; flex-shrink: 0;
+}
+.fut-dots { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+.fut-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: rgba(255,255,255,0.15); transition: background 0.2s;
+}
+.fut-dot.active { background: var(--success); }
+.fut-count { font-size: 10px; color: var(--text-tertiary); letter-spacing: 0.04em; white-space: nowrap; }
+
 /* ===== Day Ring hours editor ===== */
 .day-ring-hours-btn {
   display: inline-flex; align-items: center; gap: 5px;
@@ -676,6 +721,13 @@ body::after {
 <div class="page">
 
   <h1 class="dash-title">Chris' Dashboard</h1>
+
+  <!-- ===== FUTURE GOALS REMINDER ===== -->
+  <div class="fut-reminder hidden" id="futReminder">
+    <span class="fut-tag">PLANNED</span>
+    <div class="fut-stream" id="futStream"></div>
+    <div class="fut-dots" id="futDots"></div>
+  </div>
 
   <div class="ticker-row">
     <div class="goal-ticker" id="goalTicker" aria-live="polite" aria-atomic="true">
@@ -1467,6 +1519,114 @@ body::after {
     document.getElementById('tomorrowStatus'),
     loadTomorrow
   );
+
+  // ---------- Future goals reminder ticker ----------
+  (function () {
+    var frIdx = 0, frTimer = null, frEntries = [], frLastSig = '';
+
+    function buildFutEntries() {
+      var todayStr    = getActiveDateString();
+      var tomorrowStr = getTomorrowDateString();
+      var now = new Date();
+      var todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      var out = [];
+      storeListKeys('goals:').forEach(function (k) {
+        var dateStr = k.slice(6);
+        if (dateStr <= tomorrowStr) return; // skip today + tomorrow (already visible)
+        var goals = getGoals(k);
+        if (!goals.length) return;
+        var d = new Date(dateStr + 'T00:00');
+        if (isNaN(d)) return;
+        var days = Math.round((d.getTime() - todayMid) / 86400000);
+        goals.forEach(function (g) { out.push({ text: g.text, days: days }); });
+      });
+      out.sort(function (a, b) { return a.days - b.days; });
+      return out;
+    }
+
+    function sig(entries) {
+      return entries.map(function (e) { return e.text + '|' + e.days; }).join('~');
+    }
+
+    function whenLabel(days) {
+      if (days === 1) return 'TOMORROW';
+      if (days < 8)  return 'IN ' + days + 'D';
+      if (days < 14) return 'IN 1 WEEK';
+      return 'IN ' + Math.ceil(days / 7) + 'W';
+    }
+
+    function rebuildDOM(entries) {
+      var stream = document.getElementById('futStream');
+      var dots   = document.getElementById('futDots');
+      if (!stream || !dots) return;
+      stream.innerHTML = '';
+      entries.forEach(function (e, i) {
+        var div  = document.createElement('div');
+        div.className = 'fut-item' + (i === frIdx ? ' active' : '');
+        var nameEl = document.createElement('span');
+        nameEl.className = 'fut-item-text';
+        nameEl.textContent = e.text;
+        var whenEl = document.createElement('span');
+        whenEl.className = 'fut-item-when';
+        whenEl.textContent = whenLabel(e.days);
+        div.appendChild(nameEl);
+        div.appendChild(whenEl);
+        stream.appendChild(div);
+      });
+      dots.innerHTML = '';
+      if (entries.length <= 8) {
+        entries.forEach(function (_, i) {
+          var s = document.createElement('span');
+          s.className = 'fut-dot' + (i === frIdx ? ' active' : '');
+          dots.appendChild(s);
+        });
+      } else {
+        var fc = document.createElement('span');
+        fc.className = 'fut-count';
+        fc.textContent = (frIdx + 1) + ' / ' + entries.length;
+        dots.appendChild(fc);
+      }
+    }
+
+    function advance() {
+      if (!frEntries.length) return;
+      frIdx = (frIdx + 1) % frEntries.length;
+      var stream = document.getElementById('futStream');
+      var dots   = document.getElementById('futDots');
+      if (!stream) return;
+      stream.querySelectorAll('.fut-item').forEach(function (el, i) { el.classList.toggle('active', i === frIdx); });
+      if (dots) {
+        dots.querySelectorAll('.fut-dot').forEach(function (el, i) { el.classList.toggle('active', i === frIdx); });
+        var fc = dots.querySelector('.fut-count');
+        if (fc) fc.textContent = (frIdx + 1) + ' / ' + frEntries.length;
+      }
+    }
+
+    function renderFutReminder() {
+      var wrap = document.getElementById('futReminder');
+      if (!wrap) return;
+      var entries = buildFutEntries();
+      if (!entries.length) {
+        wrap.classList.add('hidden');
+        if (frTimer) { clearInterval(frTimer); frTimer = null; }
+        frEntries = []; frLastSig = '';
+        return;
+      }
+      wrap.classList.remove('hidden');
+      var newSig = sig(entries);
+      if (newSig !== frLastSig) {
+        frLastSig = newSig;
+        frEntries = entries;
+        if (frIdx >= entries.length) frIdx = 0;
+        rebuildDOM(entries);
+        if (frTimer) { clearInterval(frTimer); frTimer = null; }
+        if (entries.length > 1) frTimer = setInterval(advance, 5000);
+      }
+    }
+
+    window.addEventListener('goals-changed', renderFutReminder);
+    renderFutReminder();
+  })();
 
   // ---------- Plan in advance ----------
   (function () {
