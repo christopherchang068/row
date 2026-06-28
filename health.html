@@ -796,7 +796,7 @@ main {
     if (issues.length === 0) {
       msgEl.textContent = 'All caught up — keep it rolling';
       tickerEl.classList.remove('status-low', 'status-missed');
-      countEl.textContent = `0/${totalItems}`;
+      countEl.textContent = `${totalItems}/${totalItems}`;
       tickerIndex = 0;
       return;
     }
